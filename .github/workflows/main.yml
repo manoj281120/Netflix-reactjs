@@ -1,0 +1,68 @@
+name: netflix
+on:
+  workflow_dispatch:
+jobs:
+  stage1:
+    runs-on: [ec2]
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v3
+      - name: install docker
+        run: |
+          sudo apt update && upgrade -y
+          sudo apt-get install docker.io -y
+          sudo usermod -aG docker ubuntu
+          newgrp docker
+      - name: login & building & pushing docker image
+        run: |
+           echo "${{secrets.DOCKER_PASSWORD}} | docker login -u "${{secrets.DOCKER_USERNAME}}" --password-stdin
+           docker build -t img .
+           docker tag img samba1232/img2
+           docker push samba1232/img2
+  stage2:
+    needs: stage1
+    runs-on: [ec2]
+    env:
+       ACCESS_KEY: ${{secrets.ACCESS_KEY}}
+       SECRET_KEY: ${{secrets.SECRET_KEY}}
+       DEFAULT_REGION: ap-southeast-2
+       OUTPUT_FORMAT: json
+    steps:
+      - name: installing aws cli
+        run: |
+           sudo apt update
+           sudo apt install -y unzip curl
+           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+           unzip awscliv2.zip
+           sudo ./aws/install
+           aws --version
+      - name: installing eks
+        run: |
+           curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+           sudo mv /tmp/eksctl /usr/local/bin
+      - name: installing k8s
+        run: |
+           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+           chmod +x kubectl
+           sudo mv kubectl /usr/local/bin/
+      - name: creating cluster
+        run: |
+           eksctl create cluster \
+           --name netflix-cluster \
+           --version 1.27 \
+           --region ${{env.DEFAULT_REGION}} \
+           --nodegroup-name standard-workers \
+           --node-type t3.micro \
+           --nodes 4 \
+           --nodes-min 1 \
+           --nodes-max 5 \
+           --managed
+  stage3:
+     needs: stage2
+     runs-on: [ec2]
+     steps:
+      - name: deploying
+        run: |
+           kubectl apply -f deployment.yml
+           kubectl apply -f service.yml
+     
