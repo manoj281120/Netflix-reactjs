@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netflix-react-deployment
+  labels:
+    app: netflix-react
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: netflix-react
+  template:
+    metadata:
+      labels:
+        app: netflix-react
+    spec:
+      containers:
+        - name: netflix-react
+          image: samba1232/img2
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80  
