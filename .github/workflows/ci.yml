@@ -20,10 +20,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: installing eksctl
-        uses: jakejarvis/eksctl-action@v1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
         with:
-          version: latest
+          aws-access-key-id: ${{ secrets.ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.SECRET_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: Install eksctl
+        run: |
+          curl --silent --location "https://github.com/weaveworks/eksctl/releases/download/v0.106.0/eksctl_Linux_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
       - name: installing kubernetes
         uses: azure/setup-kubectl@v3
         with:
