@@ -1,12 +1,7 @@
 name: CI/CD Pipeline for Docker & EKS
 
 on:
-  push:
-    branches:
-      - main  # Trigger on push to main branch
-  pull_request:
-    branches:
-      - main  # Trigger on PR to main branch
+  workflow_dispatch:
 
 jobs:
   build:
