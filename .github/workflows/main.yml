@@ -1,68 +1,82 @@
-name: netflix
+name: CI/CD Pipeline for Docker & EKS
+
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main  # Trigger on push to main branch
+  pull_request:
+    branches:
+      - main  # Trigger on PR to main branch
+
 jobs:
-  stage1:
-    runs-on: [ec2]
+  build:
+    runs-on: ubuntu-latest
+
     steps:
-      - name: checkout code
+      # Checkout the code
+      - name: Checkout code
         uses: actions/checkout@v3
-      - name: install docker
+
+      # Set up Docker
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      # Login to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Build and Push Docker image to Docker Hub
+      - name: Build and Push Docker Image
         run: |
-          sudo apt update && upgrade -y
-          sudo apt-get install docker.io -y
-          sudo usermod -aG docker ubuntu
-          newgrp docker
-      - name: login & building & pushing docker image
-        run: |
-           echo "${{secrets.DOCKER_PASSWORD}} | docker login -u "${{secrets.DOCKER_USERNAME}}" --password-stdin
-           docker build -t img .
-           docker tag img samba1232/img2
-           docker push samba1232/img2
-  stage2:
-    needs: stage1
-    runs-on: [ec2]
-    env:
-       ACCESS_KEY: ${{secrets.ACCESS_KEY}}
-       SECRET_KEY: ${{secrets.SECRET_KEY}}
-       DEFAULT_REGION: ap-southeast-2
-       OUTPUT_FORMAT: json
+          docker build -t samba1232/img2 .
+          docker push samba1232/img2
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
     steps:
-      - name: installing aws cli
+      # Checkout the code again (for deployment)
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      # Install eksctl to create and manage the EKS cluster
+      - name: Install eksctl
         run: |
-           sudo apt update
-           sudo apt install -y unzip curl
-           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-           unzip awscliv2.zip
-           sudo ./aws/install
-           aws --version
-      - name: installing eks
+          curl --silent --location "https://github.com/weaveworks/eksctl/releases/download/v0.106.0/eksctl_Linux_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
+
+      # Set up kubectl to interact with Kubernetes
+      - name: Install kubectl
         run: |
-           curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-           sudo mv /tmp/eksctl /usr/local/bin
-      - name: installing k8s
+          curl -LO "https://dl.k8s.io/release/v1.27.0/bin/linux/amd64/kubectl"
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
+
+      # Create the EKS cluster using eksctl
+      - name: Create EKS Cluster
         run: |
-           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-           chmod +x kubectl
-           sudo mv kubectl /usr/local/bin/
-      - name: creating cluster
+          eksctl create cluster --name movie-cluster --region ap-southeast-2 --nodegroup-name standard-workers --node-type t3.micro --nodes 1 --nodes-min 1 --nodes-max 3 --managed
+
+      # Get kubectl credentials for the EKS cluster
+      - name: Set up kubectl
         run: |
-           eksctl create cluster \
-           --name netflix-cluster \
-           --version 1.27 \
-           --region ${{env.DEFAULT_REGION}} \
-           --nodegroup-name standard-workers \
-           --node-type t3.micro \
-           --nodes 4 \
-           --nodes-min 1 \
-           --nodes-max 5 \
-           --managed
-  stage3:
-     needs: stage2
-     runs-on: [ec2]
-     steps:
-      - name: deploying
+          aws eks --region ap-southeast-2 update-kubeconfig --name movie-cluster
+
+      # Deploy Docker image to Kubernetes on EKS
+      - name: Deploy to EKS
         run: |
-           kubectl apply -f deployment.yml
-           kubectl apply -f service.yml
-     
+          kubectl apply -f deployment.yml
+          kubectl apply -f service.yml
+          kubectl rollout status deployment netflix
