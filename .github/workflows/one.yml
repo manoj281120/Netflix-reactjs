@@ -33,7 +33,7 @@ jobs:
     - name: Create EKS Cluster
       run: |
         eksctl create cluster \
-          --name zenistu2-cluster \
+          --name zenistu3-cluster \
           --version 1.28 \
           --region ap-southeast-2 \
           --nodegroup-name standard-workers \
