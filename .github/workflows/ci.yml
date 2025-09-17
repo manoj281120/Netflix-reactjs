@@ -35,7 +35,7 @@ jobs:
         uses: azure/setup-kubectl@v3
       - name: creating cluster
         run: |
-          eksctl create cluster --name netflix-cluster --region ap-southeast-2 \
+          eksctl create cluster --name movieflix-cluster --region ap-southeast-2 \
           --nodegroup-name standard-workers --node-type t3.micro --nodes 1 --nodes-min 1 --nodes-max 1 --managed
       - name: deploy to eks
         run: |
