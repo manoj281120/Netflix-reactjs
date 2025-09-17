@@ -37,11 +37,12 @@ jobs:
           version: 'v1.27.0'
       - name: creating cluster
         run: |
-          eksctl create cluster --name movie-cluster --region ap-southeast-2 \
+          eksctl create cluster --name movie-cluster --version 1.27 --region ap-southeast-2 \
           --nodegroup-name standard-workers --node-type t3.micro --nodes 1 --nodes-min 1 --nodes-max 1 --managed
       - name: deploy to eks
         run: |
           kubectl apply -f deployment.yml
           kubectl apply -f service.yml
+          kubectl rollout status deployment netflix
 
     
