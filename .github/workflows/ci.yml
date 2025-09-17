@@ -33,11 +33,9 @@ jobs:
           sudo mv /tmp/eksctl /usr/local/bin
       - name: installing kubernetes
         uses: azure/setup-kubectl@v3
-        with:
-          version: v1.27.0
       - name: creating cluster
         run: |
-          eksctl create cluster --name netflix-cluster --version 1.27 --region ap-southeast-2 \
+          eksctl create cluster --name netflix-cluster --region ap-southeast-2 \
           --nodegroup-name standard-workers --node-type t3.micro --nodes 1 --nodes-min 1 --nodes-max 1 --managed
       - name: deploy to eks
         run: |
